@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频流服务器 - 视频管理与屏幕录制</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .mode-switcher {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .mode-btn {
+            padding: 10px 30px;
+            border: none;
+            border-radius: 50px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1.1em;
+        }
+        
+        .mode-btn.active {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .mode-video {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .mode-video.active {
+            background: #2563eb;
+        }
+        
+        .mode-screen {
+            background: #10b981;
+            color: white;
+        }
+        
+        .mode-screen.active {
+            background: #059669;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 50px;
+            font-weight: bold;
+            margin: 15px 0;
+            font-size: 1.1em;
+        }
+        
+        .status-running {
+            background: #10b981;
+            color: white;
+        }
+        
+        .status-stopped {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #2d3748;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            font-size: 1.8em;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+        
+        .stat-item {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 1.4em;
+            font-weight: bold;
+            color: #1e293b;
+        }
+        
+        .video-info {
+            line-height: 1.8;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .info-label {
+            color: #64748b;
+        }
+        
+        .info-value {
+            font-weight: 500;
+            color: #1e293b;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-2px);
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+        
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background: #d97706;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #94a3b8;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #64748b;
+            transform: translateY(-2px);
+        }
+        
+        .upload-section {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .upload-form {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .file-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+        
+        .screen-controls {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .control-group {
+            margin-bottom: 20px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #2d3748;
+        }
+        
+        .control-group select,
+        .control-group input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        
+        .control-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .control-row input[type="number"] {
+            width: 120px;
+        }
+        
+        .recording-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .video-list {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .video-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            margin-bottom: 15px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+            transition: all 0.3s ease;
+        }
+        
+        .video-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .video-item.active {
+            border-left-color: #10b981;
+            background: #f0fff4;
+        }
+        
+        .video-details {
+            flex: 1;
+        }
+        
+        .video-title {
+            font-weight: bold;
+            color: #1e293b;
+            margin-bottom: 5px;
+            font-size: 1.2em;
+        }
+        
+        .video-meta {
+            display: flex;
+            gap: 20px;
+            color: #64748b;
+            font-size: 0.9em;
+        }
+        
+        .video-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .type-uploaded {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .type-recording {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .video-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn-small {
+            padding: 8px 15px;
+            font-size: 0.9em;
+        }
+        
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+        
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
+        }
+        
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #ef4444;
+        }
+        
+        .alert-info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #3b82f6;
+        }
+        
+        .no-videos {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+            font-style: italic;
+        }
+        
+        .stream-preview {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .stream-image {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .window-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 10px;
+        }
+        
+        .window-item {
+            padding: 8px;
+            border-bottom: 1px solid #e2e8f0;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        
+        .window-item:hover {
+            background: #f1f5f9;
+        }
+        
+        .window-item.selected {
+            background: #dbeafe;
+            border-left: 3px solid #3b82f6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎥 视频流服务器管理系统</h1>
+            <div class="status-badge {{'status-running' if (streamer and streamer.initialized) or (screen_recorder and screen_recorder.initialized) else 'status-stopped'}}">
+                {{status}}
+            </div>
+            <p>当前时间: {{current_time}}</p>
+            
+            <div class="mode-switcher">
+                <button class="mode-btn mode-video {{'active' if CURRENT_MODE == 'video' else ''}}" 
+                        onclick="switchMode('video')">
+                    📹 视频播放
+                </button>
+                <button class="mode-btn mode-screen {{'active' if CURRENT_MODE == 'screen' else ''}}" 
+                        onclick="switchMode('screen')">
+                    🖥️ 屏幕录制
+                </button>
+            </div>
+        </div>
+        
+        <!-- 消息提示 -->
+        {% if (CURRENT_MODE == 'video' and streamer and streamer.initialized) or (CURRENT_MODE == 'screen' and screen_recorder and screen_recorder.initialized) %}
+        <div class="alert alert-success">
+            ✔ 服务器正在运行中 ({{'视频播放' if CURRENT_MODE == 'video' else '屏幕录制'}})
+        </div>
+        {% else %}
+        <div class="alert alert-info">
+            ℹ️ 请选择模式并开始播放或录制
+        </div>
+        {% endif %}
+        
+        <div class="dashboard">
+            <div class="card">
+                <h2>📊 服务器状态</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">模式</div>
+                        <div class="stat-value">{{'视频播放' if CURRENT_MODE == 'video' else '屏幕录制'}}</div>
+                    </div>
+                    {% if stats.get('mode') != 'none' %}
+                    <div class="stat-item">
+                        <div class="stat-label">{{'处理帧数' if CURRENT_MODE == 'video' else '捕获帧数'}}</div>
+                        <div class="stat-value">{{stats.get('frames_processed', stats.get('frames_captured', 0))}}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">服务帧数</div>
+                        <div class="stat-value">{{stats.get('frames_served', 0)}}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">{{'处理' if CURRENT_MODE == 'video' else '捕获'}}FPS</div>
+                        <div class="stat-value">{{"%.2f"|format(stats.get('processed_fps', stats.get('captured_fps', 0)))}}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">服务FPS</div>
+                        <div class="stat-value">{{"%.2f"|format(stats.get('served_fps', 0))}}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">队列大小</div>
+                        <div class="stat-value">{{stats.get('queue_size', 0)}}</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">运行时间</div>
+                        <div class="stat-value">{{"%.1f"|format(stats.get('elapsed_time', 0))}}秒</div>
+                    </div>
+                    {% else %}
+                    <div class="stat-item" style="grid-column: span 2;">
+                        <div class="stat-label">状态</div>
+                        <div class="stat-value">未运行</div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="controls">
+                    <a href="/jpeg_frame" target="_blank" class="btn btn-primary">📺 查看视频流</a>
+                    <a href="/status" class="btn btn-secondary">📈 详细状态</a>
+                    <a href="/stats" class="btn btn-secondary">📊 统计信息</a>
+                    <a href="/screen_preview" class="btn btn-warning">🖥️ 屏幕预览</a>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>🎬 当前内容</h2>
+                {% if (CURRENT_MODE == 'video' and current_video_info) or (CURRENT_MODE == 'screen' and screen_recorder and screen_recorder.initialized) %}
+                {% if CURRENT_MODE == 'video' %}
+                <div class="video-info">
+                    <div class="info-item">
+                        <span class="info-label">文件名称:</span>
+                        <span class="info-value">{{current_video_info['filename']}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">文件大小:</span>
+                        <span class="info-value">{{format_file_size(current_video_info['size'])}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">视频时长:</span>
+                        <span class="info-value">{{format_duration(current_video_info['duration'])}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">分辨率:</span>
+                        <span class="info-value">{{"%dx%d"|format(current_video_info['width'], current_video_info['height'])}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">帧率:</span>
+                        <span class="info-value">{{"%.2f FPS"|format(current_video_info['fps'])}}</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label">创建时间:</span>
+                        <span class="info-value">{{current_video_info['created_time']}}</span>
+                    </div>
+                </div>
+                {% elif CURRENT_MODE == 'screen' %}
+                <div class="no-videos">
+                    <p>🖥️ 正在录制屏幕</p>
+                    <p>模式: {{screen_recorder.recording_mode if screen_recorder else 'N/A'}}</p>
+                    <p>帧率: {{stats.get('target_fps', 'N/A')}} FPS</p>
+                </div>
+                {% endif %}
+                
+                <div class="stream-preview">
+                    <img src="/jpeg_frame" alt="视频流预览" class="stream-image">
+                </div>
+                {% else %}
+                <div class="no-videos">
+                    <p>📭 当前没有正在播放或录制的内容</p>
+                    <p>请选择模式并开始</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        {% if CURRENT_MODE == 'video' %}
+        <!-- 视频播放模式的内容 -->
+        <div class="upload-section" id="video-mode" style="display: block;">
+            <h2>📤 上传视频文件</h2>
+            <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" class="file-input" accept=".mp4,.avi,.mov,.mkv,.flv,.wmv" required>
+                <button type="submit" class="btn btn-success">上传视频</button>
+            </form>
+            <p style="color: #64748b; margin-top: 10px; font-size: 0.9em;">
+                支持格式: MP4, AVI, MOV, MKV, FLV, WMV | 最大文件大小: 500MB
+            </p>
+        </div>
+        
+        <div class="screen-controls" id="screen-mode" style="display: none;">
+            <h2>🖥️ 屏幕录制控制</h2>
+            <div class="control-group">
+                <label>录制模式:</label>
+                <select id="recordingMode">
+                    <option value="full_screen">全屏录制</option>
+                    <option value="window">窗口录制</option>
+                    <option value="region">区域录制</option>
+                </select>
+            </div>
+            
+            <div class="control-group" id="windowSelection" style="display: none;">
+                <label>选择窗口:</label>
+                <div class="window-list" id="windowList">
+                    <!-- 窗口列表将通过JavaScript动态加载 -->
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>帧率设置:</label>
+                <div class="control-row">
+                    <input type="number" id="targetFps" min="1" max="60" value="15">
+                    <span>FPS</span>
+                </div>
+            </div>
+            
+            <div class="recording-controls">
+                <button class="btn btn-success" onclick="startScreenRecording()">▶️ 开始录制</button>
+                <button class="btn btn-danger" onclick="stopScreenRecording()">⏹️ 停止录制</button>
+                <button class="btn btn-warning" onclick="saveScreenRecording()">💾 保存录制</button>
+                <button class="btn btn-secondary" onclick="refreshWindowList()">🔄 刷新窗口列表</button>
+            </div>
+        </div>
+        {% else %}
+        <!-- 屏幕录制模式的内容 -->
+        <div class="upload-section" id="video-mode" style="display: none;">
+            <h2>📤 上传视频文件</h2>
+            <form class="upload-form" action="/upload" method="post" enctype="multipart/form-data">
+                <input type="file" name="file" class="file-input" accept=".mp4,.avi,.mov,.mkv,.flv,.wmv" required>
+                <button type="submit" class="btn btn-success">上传视频</button>
+            </form>
+            <p style="color: #64748b; margin-top: 10px; font-size: 0.9em;">
+                支持格式: MP4, AVI, MOV, MKV, FLV, WMV | 最大文件大小: 500MB
+            </p>
+        </div>
+        
+        <div class="screen-controls" id="screen-mode" style="display: block;">
+            <h2>🖥️ 屏幕录制控制</h2>
+            <div class="control-group">
+                <label>录制模式:</label>
+                <select id="recordingMode">
+                    <option value="full_screen">全屏录制</option>
+                    <option value="window">窗口录制</option>
+                    <option value="region">区域录制</option>
+                </select>
+            </div>
+            
+            <div class="control-group" id="windowSelection" style="display: none;">
+                <label>选择窗口:</label>
+                <div class="window-list" id="windowList">
+                    <!-- 窗口列表将通过JavaScript动态加载 -->
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>帧率设置:</label>
+                <div class="control-row">
+                    <input type="number" id="targetFps" min="1" max="60" value="15">
+                    <span>FPS</span>
+                </div>
+            </div>
+            
+            <div class="recording-controls">
+                <button class="btn btn-success" onclick="startScreenRecording()">▶️ 开始录制</button>
+                <button class="btn btn-danger" onclick="stopScreenRecording()">⏹️ 停止录制</button>
+                <button class="btn btn-warning" onclick="saveScreenRecording()">💾 保存录制</button>
+                <button class="btn btn-secondary" onclick="refreshWindowList()">🔄 刷新窗口列表</button>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="video-list">
+            <h2>📁 视频文件管理</h2>
+            {% if available_videos %}
+            {% for video in available_videos %}
+            <div class="video-item{% if video['path'] == CURRENT_VIDEO %} active{% endif %}">
+                <div class="video-details">
+                    <div class="video-title">
+                        {{video['filename']}}
+                        <span class="video-type {% if video.get('type') == 'uploaded' %}type-uploaded{% else %}type-recording{% endif %}">
+                            {% if video.get('type') == 'uploaded' %}上传{% else %}录制{% endif %}
+                        </span>
+                    </div>
+                    <div class="video-meta">
+                        <span>大小: {{format_file_size(video['size'])}}</span>
+                        <span>时长: {{format_duration(video['duration'])}}</span>
+                        <span>分辨率: {{video['width']}}x{{video['height']}}</span>
+                    </div>
+                </div>
+                <div class="video-actions">
+                    {% if video['path'] == CURRENT_VIDEO %}
+                    <button class="btn btn-secondary btn-small" disabled>✅ 正在播放</button>
+                    {% else %}
+                    <a href="/play/{{video['filename']}}" class="btn btn-primary btn-small">▶️ 播放</a>
+                    {% endif %}
+                    <a href="/delete/{{video['filename']}}" class="btn btn-danger btn-small" 
+                       onclick="return confirm('确定要删除这个视频文件吗？')">🗑️ 删除</a>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="no-videos">
+                <p>📭 还没有视频文件</p>
+                <p>请上传第一个视频文件或开始屏幕录制</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script>
+        // 切换模式
+        function switchMode(mode) {
+            fetch('/switch_mode', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ mode: mode })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('切换模式失败: ' + data.error);
+                }
+            });
+        }
+        
+        // 显示/隐藏窗口选择
+        document.getElementById('recordingMode').addEventListener('change', function() {
+            const windowSelection = document.getElementById('windowSelection');
+            windowSelection.style.display = this.value === 'window' ? 'block' : 'none';
+            if (this.value === 'window') {
+                refreshWindowList();
+            }
+        });
+        
+        // 刷新窗口列表
+        function refreshWindowList() {
+            fetch('/api/windows')
+                .then(response => response.json())
+                .then(windows => {
+                    const windowList = document.getElementById('windowList');
+                    windowList.innerHTML = '';
+                    
+                    windows.forEach(windowTitle => {
+                        const div = document.createElement('div');
+                        div.className = 'window-item';
+                        div.textContent = windowTitle || '(无标题窗口)';
+                        div.onclick = function() {
+                            // 清除所有选中状态
+                            document.querySelectorAll('.window-item').forEach(item => {
+                                item.classList.remove('selected');
+                            });
+                            // 设置当前选中
+                            this.classList.add('selected');
+                            // 保存选中的窗口
+                            selectedWindow = windowTitle;
+                        };
+                        windowList.appendChild(div);
+                    });
+                });
+        }
+        
+        let selectedWindow = null;
+        
+        // 开始屏幕录制
+        function startScreenRecording() {
+            const mode = document.getElementById('recordingMode').value;
+            const fps = parseInt(document.getElementById('targetFps').value) || 15;
+            
+            const data = {
+                mode: mode,
+                fps: fps
+            };
+            
+            if (mode === 'window' && selectedWindow) {
+                data.window_title = selectedWindow;
+            }
+            
+            fetch('/api/start_recording', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('开始录制成功！');
+                    location.reload();
+                } else {
+                    alert('开始录制失败: ' + data.error);
+                }
+            });
+        }
+        
+        // 停止屏幕录制
+        function stopScreenRecording() {
+            fetch('/api/stop_recording', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('停止录制成功！');
+                    location.reload();
+                } else {
+                    alert('停止录制失败: ' + data.error);
+                }
+            });
+        }
+        
+        // 保存屏幕录制
+        function saveScreenRecording() {
+            const duration = prompt('请输入录制时长（秒）:', '10');
+            if (duration && !isNaN(duration) && parseInt(duration) > 0) {
+                fetch('/api/save_recording', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ duration: parseInt(duration) })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('录制保存成功！文件: ' + data.filename);
+                        location.reload();
+                    } else {
+                        alert('录制保存失败: ' + data.error);
+                    }
+                });
+            }
+        }
+        
+        // 自动刷新预览图像
+        function refreshPreview() {
+            const img = document.querySelector('.stream-image');
+            if (img) {
+                img.src = '/jpeg_frame?t=' + new Date().getTime();
+            }
+        }
+        
+        // 每3秒刷新一次预览
+        setInterval(refreshPreview, 3000);
+        
+        // 初始化时刷新窗口列表
+        if (document.getElementById('recordingMode').value === 'window') {
+            refreshWindowList();
+        }
+    </script>
+</body>
+</html>
